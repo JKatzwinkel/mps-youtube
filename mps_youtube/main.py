@@ -24,8 +24,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from __future__ import print_function
 
-__version__ = "0.2.2"
-__notes__ = "released 14 Feb 2015"
+__version__ = "0.2.3"
+__notes__ = "released 17 Feb 2015"
 __author__ = "np1"
 __license__ = "GPLv3"
 
@@ -1305,6 +1305,20 @@ def open_from_file():
         if not os.path.isfile(g.PLFILE):
             g.userpl = {}
             save_to_file()
+
+    except AttributeError:
+        # playlist is from a time when this module was __main__
+        # https://github.com/np1/mps-youtube/issues/214
+        import __main__
+        __main__.Playlist = Playlist
+        __main__.Video = Video
+
+        with open(g.PLFILE, "rb") as plf:
+            g.userpl = pickle.load(plf)
+
+        save_to_file()
+        xprint("Updated playlist file. Please restart mpsyt")
+        sys.exit()
 
     except EOFError:
         xprint("Error opening playlists from %s" % g.PLFILE)
@@ -2629,14 +2643,38 @@ def _make_fname(song, ext=None, av=None, subdir=None):
     filename = os.path.join(ddir, mswinfn(filename.replace("/", "-")))
     return filename
 
+def extract_metadata(name):
+    """ Try to determine metadata from video title. """
 
-def remux_audio(filename):
-    """ Remux audio file. """
+    seps = name.count(" - ")
+    artist = title = None
+
+    if seps == 1:
+
+        pos = name.find(" - ")
+        artist = name[:pos].strip()
+        title = name[pos + 3:].strip()
+
+    else:
+        title = name.strip()
+
+    return dict(artist=artist, title=title)
+
+
+def remux_audio(filename, title):
+    """ Remux audio file. Insert limited metadata tags """
     dbg("starting remux")
     temp_file = filename + "." + uni(random.randint(10000, 99999))
     os.rename(filename, temp_file)
+    meta  = extract_metadata(title)
+    metadata = ["title=%s" % meta["title"]]
 
-    cmd = [g.muxapp, "-y", "-i", temp_file, "-acodec", "copy", "-vn", filename]
+    if meta["artist"]:
+        metadata = ["title=%s" % meta["title"], "-metadata",
+                    "artist=%s" % meta["artist"]]
+
+    cmd = [g.muxapp, "-y", "-i", temp_file, "-acodec", "copy", "-metadata"]
+    cmd += metadata + ["-vn", filename]
     dbg(cmd)
 
     try:
@@ -2764,11 +2802,11 @@ def _download(song, filename, url=None, audio=False, allow_transcode=True):
     ext = filename.split(".")[-1]
     valid_ext = ext in active_encoder['valid'].split(",")
 
+    if audio and g.muxapp:
+        remux_audio(filename, song.title)
+
     if Config.ENCODER.get != 0 and valid_ext and allow_transcode:
         filename = transcode(filename, active_encoder)
-
-    elif audio and g.muxapp:
-        remux_audio(filename)
 
     return filename
 
@@ -3057,7 +3095,7 @@ def play(pre, choice, post=""):
         repeat = "repeat" in pre + post
         novid = "-a" in pre + post
         fs = "-f" in pre + post
-        nofs = "-w" in pre + post
+        nofs = "-w" in pre + post or "-v" in pre + post
 
         if (novid and fs) or (novid and nofs) or (nofs and fs):
             raise IOError("Conflicting override options specified")
@@ -4313,7 +4351,7 @@ def main():
 
     # input types
     word = r'[^\W\d][-\w\s]{,100}'
-    rs = r'(?:repeat\s*|shuffle\s*|-a\s*|-f\s*|-w\s*)'
+    rs = r'(?:repeat\s*|shuffle\s*|-a\s*|-v\s*|-f\s*|-w\s*)'
     pl = r'(?:.*=|)([-_a-zA-Z0-9]{18,50})(?:(?:\&\#).*|$)'
     regx = {
         ls: r'ls$',
@@ -4337,7 +4375,7 @@ def main():
         save_last: r'save\s*$',
         pl_search: r'(?:\.\.|\/\/|pls(?:earch)?\s)\s*(.*)$',
         # setconfig: r'set\s+([-\w]+)\s*"?([^"]*)"?\s*$',
-        setconfig: r'set\s+([-\w]+)\s*(.*?)s*$',
+        setconfig: r'set\s+([-\w]+)\s*(.*?)\s*$',
         clip_copy: r'x\s*(\d+)$',
         down_many: r'(da|dv)\s+((?:\d+\s\d+|-\d|\d+-|\d,)(?:[\d\s,-]*))\s*$',
         show_help: r'(?:help|h)(?:\s+([-_a-zA-Z]+)\s*)?$',

@@ -17,7 +17,7 @@ import py2exe
 
 setup(
     name="mps-youtube",
-    version="0.2.1",
+    version="0.2.3",
     description="Terminal based YouTube player and downloader",
     keywords=["video", "music", "audio", "youtube", "stream", "download"],
     author="np1",
@@ -27,7 +27,7 @@ setup(
     packages=['mps_youtube'],
     entry_points=dict(console_scripts=['mpsyt = mps_youtube:main.main']),
     console=['mpsyt'],
-    install_requires=['Pafy >= 0.3.72'],
+    install_requires=['pafy >= 0.3.72'],
     package_data={"": ["LICENSE", "README.rst", "CHANGELOG"]},
     classifiers=[
         "Topic :: Utilities",
