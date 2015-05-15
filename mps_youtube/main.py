@@ -1809,9 +1809,9 @@ def generate_playlist_display():
         return logo(c.g) + "\n\n"
 
     cw = getxy().width
-    fmtrow = "%s%-5s %s %-8s  %-2s%s\n"
-    fmthd = "%s%-5s %-{}s %-9s %-5s%s\n".format(cw - 23)
-    head = (c.ul, "Item", "Playlist", "Updated", "Count", c.w)
+    fmtrow = "%s%-5s %s %-12s %-8s  %-2s%s\n"
+    fmthd = "%s%-5s %-{}s %-12s %-9s %-5s%s\n".format(cw - 36)
+    head = (c.ul, "Item", "Playlist", "Author", "Updated", "Count", c.w)
     out = "\n" + fmthd % head
 
     for n, x in enumerate(g.ytpls):
@@ -1819,9 +1819,10 @@ def generate_playlist_display():
         length = x.get('size') or "?"
         length = "%4s" % length
         title = x.get('title') or "unknown"
+        author = x.get('author') or "unknown"
         updated = yt_datetime(x.get('updated'))[1]
-        title = uea_pad(cw - 23, title)
-        out += (fmtrow % (col, str(n + 1), title, updated, str(length), c.w))
+        title = uea_pad(cw - 36, title)
+        out += (fmtrow % (col, str(n + 1), title, author[:12], updated, str(length), c.w))
 
     return out + "\n" * (5 - len(g.ytpls))
 
@@ -1905,7 +1906,7 @@ def generate_songlist_display(song=False, zeromsg=None, frmat="search"):
         otitle = details['title']
         details['idx'] = "%2d" % (n + 1)
         details['title'] = uea_pad(columns[1]['size'], otitle)
-        cat = details.get('category')
+        cat = details.get('category') or '-'
         details['category'] = g.category_names.get(cat, cat)
         data = []
 
@@ -2768,7 +2769,7 @@ def get_pl_from_json(pldata):
             link=item.get("id"),
             size=item.get("contentDetails", {}).get("itemCount"),
             title=snippet.get("title"),
-            author=item.get("channelTitle"),
+            author=snippet.get("channelTitle"),
             created=snippet.get("publishedAt"),
             updated=snippet.get('publishedAt'), #XXX Not available in API?
             description=snippet.get("description")))
