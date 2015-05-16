@@ -4265,62 +4265,31 @@ def dump(un):
         g.content = generate_songlist_display()
 
 
-def plist(parturl, page=1, splash=True, dumps=False):
-    """ Retrieve YouTube playlist. """
-    max_results = getxy().max_results
-
-    if "playlist" in g.last_search_query and\
-            parturl == g.last_search_query['playlist']:
-
-        # go to pagenum
-        s = (page - 1) * max_results
-        e = page * max_results
-
-        if dumps:
-            s, e = 0, 99999
-
-        g.model.songs = g.ytpl['items'][s:e]
-        g.content = generate_songlist_display()
-        g.message = "Showing YouTube playlist: %s" % c.y + g.ytpl['name'] + c.w
-        g.current_page = page
-        return
+def plist(parturl, page=None, splash=True, dumps=False):
+    """ Retrieve YouTube playlist items. """
+    url = "https://www.googleapis.com/youtube/v3/playlistItems"
+    query = generate_search_qs(parturl, page=page, match='playlistId')
 
     if splash:
         g.content = logo(col=c.b)
         g.message = "Retreiving YouTube playlist"
         screen_update()
 
-    dbg("%sFetching playlist using pafy%s", c.y, c.w)
-    yt_playlist = pafy.get_playlist(parturl)
-    g.pafy_pls[parturl] = yt_playlist
-    ytpl_items = yt_playlist['items']
-    ytpl_title = yt_playlist['title']
-    g.content = generate_songlist_display()
-    songs = []
+    have_results = _search(url, parturl, query)
 
-    for item in ytpl_items:
-        # Create Video object, appends to songs
-        cur = Video(ytid=item['pafy'].videoid,
-                    title=item['pafy'].title,
-                    length=item['pafy'].length)
-        songs.append(cur)
+    if have_results:
+        g.message = "Search results for %s%s%s" % (c.y, parturl, c.w)
+        g.last_opened = ""
+        g.last_search_query = {"playlist": parturl}
+        g.browse_mode = "normal"
+        g.current_pagetoken = page or ''
+        g.content = generate_songlist_display(frmat="search")
 
-    if not ytpl_items:
-        dbg("got unexpected data or no search results")
-        return False
-
-    g.last_search_query = {"playlist": parturl}
-    g.browse_mode = "normal"
-    g.ytpl = dict(name=ytpl_title, items=songs)
-    g.current_page = 1
-    g.model.songs = songs[:max_results]
-    # preload first result url
-    kwa = {"song": songs[0], "delay": 0}
-    t = threading.Thread(target=preload, kwargs=kwa)
-    t.start()
-
-    g.content = generate_songlist_display()
-    g.message = "Showing YouTube playlist %s" % (c.y + ytpl_title + c.w)
+    else:
+        g.message = "Found nothing for %s%s%s" % (c.y, parturl, c.w)
+        g.content = logo(c.r)
+        g.current_pagetoken = ''
+        g.last_search_query = {}
 
 
 def shuffle_fn(_):
@@ -4840,6 +4809,7 @@ Then, when results are shown:
 {2}user <username>/<query>{1} - as above, but matches <query>.
 {2}userpl <username>{1} - list YouTube playlists created by <username>.
 {2}pl <url or id>{1} - Open YouTube playlist by url or id.
+{2}pls <query>{1} - Search YouTube playlist matching query.
 {2}url <url or id>{1} - Retrieve specific YouTube video by url or id.
 
 {2}r <number>{1} - show videos related to video <number>.
