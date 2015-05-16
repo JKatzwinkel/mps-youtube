@@ -2452,7 +2452,7 @@ def _search(url, progtext, qs=None, splash=True, pre_load=True):
 
 
 
-def generate_search_qs(term, page=None, result_count=None, match='term'):
+def generate_search_qs(term, page=None, result_count=None, match='q'):
     """ Return query string. """
     if not result_count:
         result_count = getxy().max_results
@@ -2460,7 +2460,6 @@ def generate_search_qs(term, page=None, result_count=None, match='term'):
     aliases = dict(views='viewCount')
     term = utf8_encode(term)
     qs = {
-        'q': term,
         'maxResults': result_count,
         'safeSearch': "none",
         'order': aliases.get(Config.ORDER.get, Config.ORDER.get),
@@ -2468,10 +2467,12 @@ def generate_search_qs(term, page=None, result_count=None, match='term'):
         'type': 'video',
         'key': Config.API_KEY.get
     }
+    qs[match] = term
 
-    if match == 'related':
-        qs['relatedToVideoId'] = term
-        del qs['q']
+    if match in ['relatedToVideoId', 'playlistId']:
+        if match == 'playlistId':
+            del qs['type']
+            del qs['order']
 
     if page:
         qs['pageToken'] = page
@@ -2600,7 +2601,7 @@ def usersearch_id(q_user, page=None, splash=True):
 
 def related_search(vitem, page=None, splash=True):
     """ Fetch uploads by a YouTube user. """
-    query = generate_search_qs(vitem.ytid, page, match='related')
+    query = generate_search_qs(vitem.ytid, page, match='relatedToVideoId')
 
     if query.get('category'):
         del query['category']
