@@ -3395,10 +3395,13 @@ def down_many(dltype, choice, subdir=None):
 
 def down_plist(dltype, parturl):
     """ Download YouTube playlist. """
-    plist(parturl, page=1, splash=True, dumps=True)
     title = g.pafy_pls[parturl]['title']
     subdir = mswinfn(title.replace("/", "-"))
+    plist(parturl, page=None, splash=True, dumps=True)
     down_many(dltype, "1-", subdir=subdir)
+    while nextprev('n'):
+        down_many(dltype, "1-", subdir=subdir)
+    plist(parturl, page='', splash=True, dumps=True)
 
 
 def down_user_pls(dltype, user):
@@ -3406,8 +3409,6 @@ def down_user_pls(dltype, user):
     user_pls(user)
     for pl in g.ytpls:
         down_plist(dltype, pl.get('link'))
-
-    return
 
 
 def play(pre, choice, post=""):
@@ -3816,10 +3817,7 @@ def download(dltype, num):
     # pylint: disable=R0914
     if g.browse_mode == "ytpl" and dltype in ("da", "dv"):
         plid = g.ytpls[int(num) - 1]["link"]
-        plist(plid, page=1, splash=True, dumps=True)
-        title = g.pafy_pls[plid]['title']
-        subdir = mswinfn(title.replace("/", "-"))
-        down_many(dltype, "1-", subdir=subdir)
+        down_plist(dltype, plid)
         return
 
     elif g.browse_mode == "ytpl":
@@ -4086,6 +4084,7 @@ def nextprev(np):
         g.message = "No %s items to display" % norp
 
     g.content = generate_songlist_display(frmat="search")
+    return good
 
 
 def user_more(num):
