@@ -2774,14 +2774,16 @@ def get_pl_from_json(pldata):
 
     for item in items:
         snippet = item['snippet']
-        results.append(dict(
+        ytpl = dict(
             link=item["id"],
             size=item["contentDetails"]["itemCount"],
             title=snippet["title"],
             author=snippet["channelTitle"],
             created=snippet["publishedAt"],
             updated=snippet['publishedAt'], #XXX Not available in API?
-            description=snippet["description"]))
+            description=snippet["description"])
+        results.append(ytpl)
+        g.pafy_pls[ytpl['link']] = ytpl
 
     return results
 
@@ -4280,13 +4282,14 @@ def plist(parturl, page=None, splash=True, dumps=False):
 
     if splash:
         g.content = logo(col=c.b)
-        g.message = "Retreiving YouTube playlist"
+        g.message = "Retrieving YouTube playlist"
         screen_update()
 
-    have_results = _search(url, parturl, query)
+    ytpl = g.pafy_pls.get(parturl, {})
+    have_results = _search(url, ytpl['title'], query)
 
     if have_results:
-        g.message = "Search results for %s%s%s" % (c.y, parturl, c.w)
+        g.message = "Showing YouTube playlist: %s" % c.y + ytpl['title'] + c.w
         g.last_opened = ""
         g.last_search_query = {"playlist": parturl}
         g.browse_mode = "normal"
@@ -4294,7 +4297,7 @@ def plist(parturl, page=None, splash=True, dumps=False):
         g.content = generate_songlist_display(frmat="search")
 
     else:
-        g.message = "Found nothing for %s%s%s" % (c.y, parturl, c.w)
+        g.message = "Found nothing for %s%s%s" % (c.y, ytpl['title'], c.w)
         g.content = logo(c.r)
         g.current_pagetoken = ''
         g.last_search_query = {}
