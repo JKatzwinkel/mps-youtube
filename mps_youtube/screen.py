@@ -3,7 +3,7 @@ import collections
 import os
 import sys
 
-from . import g, terminalsize
+from . import c, g, terminalsize
 from .util import xprint, has_exefile
 from .config import Config
 
@@ -42,7 +42,7 @@ def update(fill_blank=True):
 
     if g.message or g.rprompt:
         out = g.message or ''
-        blanks = getxy().width - len(out) - len(g.rprompt or '')
+        blanks = getxy().width - c.mlen(out) - c.mlen(g.rprompt or '') - 3
         out += ' ' * blanks + (g.rprompt or '')
         xprint(out)
 
