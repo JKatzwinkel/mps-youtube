@@ -1,20 +1,17 @@
 import re
 import difflib
 import time
+import threading
 from xml.etree import ElementTree as ET
 from urllib.error import HTTPError, URLError
 from urllib.request import build_opener
 
-from mps_youtube import Plugin, registerPlugin, Config, c
-from mps_youtube import __version__ as mpsyt_ver, __url__ as mpsyt_url
+import mps_youtube as mpsyt
+from mps_youtube import c, dbg
 
-
-@registerPlugin
-class AlbumSearchPlugin(Plugin):
-    name = "Album Search"
-    author = "mps-youtube"
-    version = 1 #TODO: Same as mps_youtube version?
-    description = "Adds album command to search for albums using MusicBrainz"
+@mpsyt.registerPlugin('album_search')
+class AlbumSearchPlugin(mpsyt.Plugin):
+    pass
 
 
 @AlbumSearchPlugin.command(r'album\s*(.{0,500})', 'search',
@@ -133,7 +130,7 @@ def _do_query(url, query, err='query failed', report=False):
 
     """
     # create url opener
-    ua = "mps-youtube/%s ( %s )" % (mpsyt_ver, mpsyt_url)
+    ua = "mps-youtube/%s ( %s )" % (mpsyt.__version__, mpsyt.__url__)
     mpsyt_opener = build_opener()
     mpsyt_opener.addheaders = [('User-agent', ua)]
 

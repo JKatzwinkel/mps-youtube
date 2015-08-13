@@ -13,7 +13,16 @@ import os
 if sys.version_info < (3,0):
     sys.exit("Mps-youtube requires python 3.")
 
+import shutil
+import base64
 from setuptools import setup
+
+print('generating core plugins zip')
+shutil.make_archive('core_plugins', 'zip', 'plugins')
+print('generating _plugins_generated.py from zip')
+b85data = base64.b85encode(open('core_plugins.zip', 'rb').read())
+with open("mps_youtube/_plugins_generated.py", 'w') as pfile:
+    pfile.write('data = ' +  repr(b85data))
 
 options = dict(
     name="mps-youtube",
@@ -27,7 +36,6 @@ options = dict(
     packages=['mps_youtube'],
     entry_points={'console_scripts': ['mpsyt = mps_youtube:main.main']},
     install_requires=['pafy >= 0.3.74'],
-    package_data={"": ["LICENSE", "README.rst", "CHANGELOG"]},
     classifiers=[
         "Topic :: Utilities",
         "Topic :: Internet :: WWW/HTTP",
@@ -61,12 +69,13 @@ options = dict(
             "bundle_files": 1
         }
     },
+    data_files=[("", ["LICENSE", "README.rst", "CHANGELOG"])],
     long_description=open("README.rst").read()
 )
 
 if sys.platform.startswith('linux'):
     # Install desktop file. Required for mpris on Ubuntu
-    options['data_files'] = [('share/applications/', ['mps-youtube.desktop'])]
+    options['data_files'].append(('share/applications/', ['mps-youtube.desktop']))
 
 if os.name == "nt":
     try:

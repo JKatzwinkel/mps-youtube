@@ -4,6 +4,7 @@ from __future__ import print_function
 import os
 import re
 import sys
+import ctypes
 import subprocess
 import logging
 
@@ -53,7 +54,7 @@ def get_mpv_version(exename):
 
 def get_mplayer_version(exename):
     o = subprocess.check_output([exename]).decode()
-    m = re.search('^MPlayer SVN-r([0-9]+) ', o, re.MULTILINE)
+    m = re.search('^MPlayer SVN[\s-]r([0-9]+)', o, re.MULTILINE|re.IGNORECASE)
 
     ver = 0
     if m:
@@ -84,11 +85,7 @@ def utf8_replace(txt):
 
 def xenc(stuff):
     """ Replace unsupported characters. """
-    if sys.stdout.isatty():
-        return utf8_replace(stuff) if not_utf8_environment else stuff
-
-    else:
-        return stuff.encode("utf8", errors="replace").decode()
+    return utf8_replace(stuff) if not_utf8_environment else stuff
 
 
 def xprint(stuff, end=None):
@@ -109,7 +106,7 @@ def mswinfn(filename):
 def set_window_title(title):
     """ Set terminal window title. """
     if mswin:
-        os.system(xenc("title " + title))
+        ctypes.windll.kernel32.SetConsoleTitleW(xenc(title))
     else:
         sys.stdout.write(xenc('\x1b]2;' + title + '\x07'))
 

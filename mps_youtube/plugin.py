@@ -1,10 +1,18 @@
 import os
 import re
 import collections
-import pkgutil
+import json
+import base64
+from zipfile import ZipFile
+from zipimport import zipimporter
+from importlib.machinery import PathFinder
 
-from . import g, plugins, commands
+from . import g, commands, _plugins_generated
 
+coreplugin_data = base64.b85decode(_plugins_generated.data)
+os.makedirs(g.PLUGINDIR, exist_ok=True)
+with open(os.path.join(g.PLUGINDIR, 'core_plugins.zip'), 'wb') as corepfile:
+    corepfile.write(coreplugin_data)
 
 EventHandler = collections.namedtuple('EventHandler', 'name function')
 
@@ -53,25 +61,39 @@ class Plugin:
         pass
     
 
-def registerPlugin(plugin):
+def registerPlugin(name):
     """ Decorator to register a plugin with mps-youtube. """
 
-    g.plugins[plugin.name] = plugin
-    return plugin
+    def decorator(plugin):
+        g.plugins[name] = plugin
+        return plugin
+    return decorator
 
 
 def loadPlugins():
     """ Loads all mps-youtube plugins. """
-
-    pluginpaths = plugins.__path__ + [g.PLUGINDIR]
-
-    for loader, name, is_pkg in  pkgutil.iter_modules(pluginpaths):
-        loader.find_module(name).load_module(name)
+    pass
 
 
 @commands.command(r'pluginload\s+([^./]+)\s*$')
 def loadPlugin(name):
     #TODO: Make user friendly. This is just the testing interface.
+
+    pluginpaths = [os.path.join(g.PLUGINDIR, i)
+            for i in os.listdir(g.PLUGINDIR)]
+    finder = PathFinder()
+    loader = finder.find_module(name, path=pluginpaths)
+
+    if isinstance(loader, zipimporter):
+        with ZipFile(loader.archive, 'r') as pkgzip:
+            metadata = json.loads(pkgzip.open('metadata.json', 'r'
+                ).read().decode("utf-8"))[name]
+    else:
+        with open(os.path.split(loader.path)[0] + '/metadata.json') as pkgmeta:
+            metadata = json.loads(pkgmeta.read())[name]
+
+    loader.load_module(name)
+
     g.enabled_plugins[name] = g.plugins[name]()
 
 

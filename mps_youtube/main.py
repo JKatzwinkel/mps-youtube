@@ -871,13 +871,8 @@ def get_tracks_from_json(jsons):
     # fetch detailed information about items from videos API
     qs = {'part':'contentDetails,statistics,snippet',
           'id': ','.join([get_track_id_from_json(i) for i in items])}
-    try:
-        wdata = call_gdata('videos', qs)
 
-    except GdataError as e:
-        g.message = F('no data') % e
-        g.content = logo(c.r)
-        return
+    wdata = call_gdata('videos', qs)
 
     items_vidinfo = wdata.get('items', [])
     # enhance search results by adding information from videos API response
@@ -1031,22 +1026,19 @@ def real_len(u, alt=False):
     return int(round(sum(widths.get(ueaw(char), 1) for char in u)))
 
 
-def uea_trunc(num, t):
-    """ Truncate to num chars taking into account East Asian width chars. """
-    while real_len(t) > num:
-        t = t[:-1]
-
-    return t
-
-
 def uea_pad(num, t, direction="<", notrunc=False):
     """ Right pad with spaces taking into account East Asian width chars. """
     direction = direction.strip() or "<"
 
     t = ' '.join(t.split('\n'))
+    
+    # TODO: Find better way of dealing with this?
+    if num <= 0:
+        return ''
 
     if not notrunc:
-        t = uea_trunc(num, t)
+        # Truncate to max of num characters
+        t = t[:num]
 
     if real_len(t) < num:
         spaces = num - real_len(t)
@@ -1158,6 +1150,8 @@ def generate_songlist_display(song=False, zeromsg=None, frmat="search"):
     if g.browse_mode == "ytpl":
         return generate_playlist_display()
 
+    max_results = screen.getxy().max_results
+
     songs = g.model.songs or []
 
     if not songs:
@@ -1190,7 +1184,7 @@ def generate_songlist_display(song=False, zeromsg=None, frmat="search"):
     hrow = c.ul + fmt % titles + c.w
     out = "\n" + hrow + "\n"
 
-    for n, x in enumerate(songs):
+    for n, x in enumerate(songs[:max_results]):
         col = (c.r if n % 2 == 0 else c.p) if not song else c.b
         details = {'title': x.title, "length": fmt_time(x.length)}
         details = g.meta[x.ytid].copy() if have_meta else details
@@ -1327,7 +1321,7 @@ def playsong(song, failcount=0, override=False):
         return
 
     if Config.NOTIFIER.get:
-        subprocess.call(shlex.split(Config.NOTIFIER.get) + [song.title])
+        subprocess.Popen(shlex.split(Config.NOTIFIER.get) + [song.title])
 
     # don't interrupt preloading:
     while song.ytid in g.preloading:
@@ -1689,14 +1683,8 @@ def _search(progtext, qs=None, splash=True, pre_load=True):
         screen.update()
 
     # perform fetch
-    try:
-        wdata = call_gdata('search', qs)
-        songs = get_tracks_from_json(wdata)
-
-    except GdataError as e:
-        g.message = F('no data') % e
-        g.content = logo(c.r)
-        return
+    wdata = call_gdata('search', qs)
+    songs = get_tracks_from_json(wdata)
 
     if songs and pre_load:
         # preload first result url
@@ -1965,16 +1953,11 @@ def pl_search(term, page=0, splash=True, is_user=False):
         if 'videoCategoryId' in qs:
             del qs['videoCategoryId'] # Incompatable with type=playlist
 
-        try:
-            pldata = call_gdata('search', qs)
-            id_list = [i.get('id', {}).get('playlistId')
-                        for i in pldata.get('items', ())]
-            # page info
-            get_page_info_from_json(pldata, len(id_list))
-        except GdataError as e:
-            g.message = F('no data') % e
-            g.content = logo(c.r)
-            return
+        pldata = call_gdata('search', qs)
+        id_list = [i.get('id', {}).get('playlistId')
+                    for i in pldata.get('items', ())]
+        # page info
+        get_page_info_from_json(pldata, len(id_list))
 
     qs = {'part': 'contentDetails,snippet',
           'maxResults': 50}
@@ -1986,13 +1969,8 @@ def pl_search(term, page=0, splash=True, is_user=False):
     else:
         qs['id'] = ','.join(id_list)
 
-    try:
-        pldata = call_gdata('playlists', qs)
-        playlists = get_pl_from_json(pldata)
-    except GdataError as e:
-        g.message = F('no data') % e
-        g.content = logo(c.r)
-        return
+    pldata = call_gdata('playlists', qs)
+    playlists = get_pl_from_json(pldata)
 
     if playlists:
         g.last_search_query = {"playlists": {"term": term, "is_user": is_user}}
@@ -2101,13 +2079,7 @@ def fetch_comments(item):
     # XXX should comment threads be expanded? this would require
     # additional requests for comments responding on top level comments
 
-    try:
-        jsdata = call_gdata('commentThreads', qs)
-
-    except GdataError as e:
-        g.message = "No comments for %s\n%s" % (item.title[:50], e)
-        g.content = generate_songlist_display()
-        return
+    jsdata = call_gdata('commentThreads', qs)
 
     coms = jsdata.get('items', [])
     coms = [x.get('snippet', {}) for x in coms]
@@ -2576,6 +2548,7 @@ def down_many(dltype, choice, subdir=None):
 
     try:
         for song in downsongs:
+            g.result_count = len(g.model.songs)
             disp = generate_songlist_display()
             title = "Download Queue (%s):%s\n\n" % (av, c.w)
             disp = re.sub(r"(Num\s*?Title.*?\n)", title, disp)
@@ -2613,6 +2586,7 @@ def down_many(dltype, choice, subdir=None):
     finally:
         g.model.songs = temp[::]
         g.message = msg
+        g.result_count = len(g.model.songs)
         g.content = generate_songlist_display()
 
 
@@ -2624,6 +2598,9 @@ def down_plist(dltype, parturl):
     title = g.pafy_pls[parturl]['title']
     subdir = mswinfn(title.replace("/", "-"))
     down_many(dltype, "1-", subdir=subdir)
+    msg = g.message
+    plist(parturl, page=0, splash=True)
+    g.message = msg
 
 
 @commands.command(r'(da|dv)upl\s+(.*)$')
@@ -3499,8 +3476,6 @@ def plist(parturl, page=0, splash=True, dumps=False):
     g.pafy_pls[parturl] = yt_playlist
     ytpl_items = yt_playlist['items']
     ytpl_title = yt_playlist['title']
-    g.result_count = len(ytpl_items)
-    g.more_pages = max_results < len(ytpl_items)
 
     songs = []
 
@@ -3519,7 +3494,9 @@ def plist(parturl, page=0, splash=True, dumps=False):
     g.browse_mode = "normal"
     g.ytpl = dict(name=ytpl_title, items=songs)
     g.current_page = 0
-    g.model.songs = songs[:max_results]
+    g.result_count = len(g.ytpl['items'])
+    g.more_pages = max_results < len(g.ytpl['items'])
+    g.model.songs = songs[:max_results] if not dumps else songs[::]
     # preload first result url
     kwa = {"song": songs[0], "delay": 0}
     t = threading.Thread(target=preload, kwargs=kwa)
@@ -3590,6 +3567,10 @@ def matchfunction(func, regex, userinput):
                 g.message = F('cant get track') % str(e)
                 g.content = g.content or\
                     generate_songlist_display(zeromsg=g.message)
+
+            except GdataError as e:
+                g.message = F('no data') % e
+                g.content = g.content
 
         return True
 
